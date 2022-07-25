@@ -179,7 +179,7 @@ public class Tests {
 
         RestAssured.given()
                 .when().get(petUrl + "/" + petId)
-                .then().log().all().statusCode(HttpStatus.SC_OK)
+                .then().statusCode(HttpStatus.SC_OK)
                 .and().contentType(ContentType.JSON)
                 .and().body("category.id", equalTo(petCategoryId))
                 .and().body("category.name", equalTo(petCategoryName))
@@ -199,15 +199,15 @@ public class Tests {
 
         createOrderJson.put("petId", petId);
 
-        orderId = RestAssured.given().log().all().contentType(ContentType.JSON).body(createOrderJson.toString())
-                .when().log().all().post(storeUrl + "/order")
-                .then().log().all().statusCode(HttpStatus.SC_OK)
+        orderId = RestAssured.given().contentType(ContentType.JSON).body(createOrderJson.toString())
+                .when().post(storeUrl + "/order")
+                .then().statusCode(HttpStatus.SC_OK)
                 .and().contentType(ContentType.JSON)
                 .extract().path("id");
 
         RestAssured.given()
                 .when().get(storeUrl + "/order/" + orderId)
-                .then().log().all().statusCode(HttpStatus.SC_OK)
+                .then().statusCode(HttpStatus.SC_OK)
                 .and().contentType(ContentType.JSON)
 //                .and().body("petId", equalTo(petId)) //TODO: 0 != 0L
                 .and().body("quantity", equalTo(orderQuantity))
@@ -222,14 +222,14 @@ public class Tests {
     @Order(5)
     public void deletePetAndOrder() {
         RestAssured.given()
-                .when().log().all().delete(storeUrl + "/order/" + orderId)
-                .then().log().all().statusCode(HttpStatus.SC_OK)
+                .when().delete(storeUrl + "/order/" + orderId)
+                .then().statusCode(HttpStatus.SC_OK)
                 .and().contentType(ContentType.JSON)
                 .and().body("type", equalTo("unknown"));
 
         RestAssured.given()
-                .when().log().all().delete(petUrl + "/" + petId)
-                .then().log().all().statusCode(HttpStatus.SC_OK)
+                .when().delete(petUrl + "/" + petId)
+                .then().statusCode(HttpStatus.SC_OK)
                 .and().contentType(ContentType.JSON)
                 .and().body("type", equalTo("unknown"));
     }
@@ -238,15 +238,15 @@ public class Tests {
     @Order(6)
     public void deleteUser() {
         RestAssured.given()
-                .when().log().all().delete(userUrl + "/" + userName)
-                .then().log().all().statusCode(HttpStatus.SC_OK)
+                .when().delete(userUrl + "/" + userName)
+                .then().statusCode(HttpStatus.SC_OK)
                 .and().contentType(ContentType.JSON)
                 .and().body("type", equalTo("unknown"))
                 .and().body("message", equalTo(userName));
 
         RestAssured.given()
                 .when().get(userUrl + "/" + userName)
-                .then().log().all().statusCode(HttpStatus.SC_NOT_FOUND)
+                .then().statusCode(HttpStatus.SC_NOT_FOUND)
                 .and().contentType(ContentType.JSON)
                 .and().body("code", equalTo(1))
                 .and().body("type", equalTo("error"))
