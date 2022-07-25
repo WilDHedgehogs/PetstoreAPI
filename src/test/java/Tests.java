@@ -92,6 +92,8 @@ public class Tests {
     public void release() {
         usersJsonArray.clear();
         createUserJson.clear();
+        createPetJson.clear();
+        createOrderJson.clear();
     }
 
     @Test
