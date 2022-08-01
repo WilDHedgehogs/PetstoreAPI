@@ -2,9 +2,12 @@ import io.restassured.RestAssured;
 import io.restassured.config.SSLConfig;
 import io.restassured.http.ContentType;
 import org.apache.http.HttpStatus;
+import org.awaitility.Awaitility;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.jupiter.api.*;
+
+import java.util.concurrent.TimeUnit;
 
 import static io.restassured.RestAssured.config;
 import static org.hamcrest.Matchers.*;
@@ -25,18 +28,18 @@ public class Tests {
     private String userEmail = "test_user_email@gmail.com";
     private String userPassword = "test_user_password";
     private String userPhone = "+7(987)65-43-21";
-    private int userStatus = 0;
+    private Integer userStatus = 0;
     private String userUpdatedPhone = "+7(123)45-67-89";
     private long petId = 0;
-    private int petCategoryId = 0;
+    private Integer petCategoryId = 0;
     private String petCategoryName = "test_pet_category_name";
     private String petName = "test_pet_name";
     private String petPhotoUrl = "test_pet_photo_url.com";
-    private int petTagId = 0;
+    private Integer petTagId = 0;
     private String petTagName = "test_pet_tag_name";
     private String petStatus = "test_pet_status";
-    private long orderId = 0;
-    private int orderQuantity = 1;
+    private Integer orderId = 0;
+    private Integer orderQuantity = 1;
     private String shipDate = "2022-06-11T08:01:50.696Z";
     private String orderStatus = "placed";
     private boolean orderComplete = true;
@@ -106,6 +109,8 @@ public class Tests {
                 .and().body("type", equalTo("unknown"))
                 .and().body("message", equalTo("ok"));
 
+        Awaitility.await().atMost(2, TimeUnit.SECONDS);
+
         userId = RestAssured.given()
                 .when().get(userUrl + "/" + userName)
                 .then().statusCode(HttpStatus.SC_OK)
@@ -116,7 +121,7 @@ public class Tests {
                 .and().body("email", equalTo(userEmail))
                 .and().body("password", equalTo(userPassword))
                 .and().body("phone", equalTo(userPhone))
-                .and().body("userStatus", equalTo(userStatus))
+                .and().body("userStatus", equalTo((int) userStatus))
                 .extract().path("id");
 
         login();
@@ -153,6 +158,8 @@ public class Tests {
                 .and().contentType(ContentType.JSON)
                 .and().body("type", equalTo("unknown"));
 
+        Awaitility.await().atMost(2, TimeUnit.SECONDS);
+
         RestAssured.given()
                 .when().get(userUrl + "/" + userName)
                 .then().statusCode(HttpStatus.SC_OK)
@@ -163,7 +170,7 @@ public class Tests {
                 .and().body("email", equalTo(userEmail))
                 .and().body("password", equalTo(userPassword))
                 .and().body("phone", equalTo(userUpdatedPhone))
-                .and().body("userStatus", equalTo(userStatus));
+                .and().body("userStatus", equalTo((int) userStatus));
     }
 
     @Test
@@ -181,11 +188,11 @@ public class Tests {
                 .when().get(petUrl + "/" + petId)
                 .then().statusCode(HttpStatus.SC_OK)
                 .and().contentType(ContentType.JSON)
-                .and().body("category.id", equalTo(petCategoryId))
+                .and().body("category.id", equalTo((int) petCategoryId))
                 .and().body("category.name", equalTo(petCategoryName))
                 .and().body("name", equalTo(petName))
                 .and().body("photoUrls[0]", equalTo(petPhotoUrl))
-                .and().body("tags[0].id", equalTo(petTagId))
+                .and().body("tags[0].id", equalTo((int) petTagId))
                 .and().body("tags[0].name", equalTo(petTagName))
                 .and().body("status", equalTo(petStatus));
 
@@ -209,9 +216,9 @@ public class Tests {
                 .when().get(storeUrl + "/order/" + orderId)
                 .then().statusCode(HttpStatus.SC_OK)
                 .and().contentType(ContentType.JSON)
-//                .and().body("petId", equalTo(petId)) //TODO: 0 != 0L
+                .and().body("petId", equalTo(petId))
                 .and().body("quantity", equalTo(orderQuantity))
-//                .and().body("shipDate", equalTo(shipDate)) //TODO: Формат
+                .and().body("shipDate", containsString(shipDate.substring(0, 23)))
                 .and().body("status", equalTo(orderStatus))
                 .and().body("complete", equalTo(orderComplete));
 
@@ -243,6 +250,8 @@ public class Tests {
                 .and().contentType(ContentType.JSON)
                 .and().body("type", equalTo("unknown"))
                 .and().body("message", equalTo(userName));
+
+        Awaitility.await().atMost(2, TimeUnit.SECONDS);
 
         RestAssured.given()
                 .when().get(userUrl + "/" + userName)
