@@ -1,6 +1,11 @@
 import io.restassured.RestAssured;
+import io.restassured.builder.RequestSpecBuilder;
+import io.restassured.builder.ResponseSpecBuilder;
 import io.restassured.config.SSLConfig;
 import io.restassured.http.ContentType;
+import io.restassured.path.json.JsonPath;
+import io.restassured.specification.RequestSpecification;
+import io.restassured.specification.ResponseSpecification;
 import org.apache.http.HttpStatus;
 import org.awaitility.Awaitility;
 import org.json.JSONArray;
@@ -38,7 +43,7 @@ public class Tests {
     private Integer petTagId = 0;
     private String petTagName = "test_pet_tag_name";
     private String petStatus = "test_pet_status";
-    private Integer orderId = 0;
+    private long orderId = 0;
     private Integer orderQuantity = 1;
     private String shipDate = "2022-06-11T08:01:50.696Z";
     private String orderStatus = "placed";
@@ -48,6 +53,21 @@ public class Tests {
     JSONArray usersJsonArray = new JSONArray();
     JSONObject createPetJson = new JSONObject();
     JSONObject createOrderJson = new JSONObject();
+    RequestSpecification createUserSpecification;
+    RequestSpecification createPetSpecification;
+    RequestSpecification createOrderSpecification;
+    RequestSpecification loginSpecification;
+
+    ResponseSpecification okResponse = new ResponseSpecBuilder()
+            .expectStatusCode(HttpStatus.SC_OK)
+            .expectContentType(ContentType.JSON)
+            .build();
+
+    ResponseSpecification notFoundResponse = new ResponseSpecBuilder()
+            .expectStatusCode(HttpStatus.SC_NOT_FOUND)
+            .expectContentType(ContentType.JSON)
+            .build();
+
 
     SSLConfig sslConfig = config.getSSLConfig();
 
@@ -89,6 +109,25 @@ public class Tests {
                 .put("shipDate", shipDate)
                 .put("status", orderStatus)
                 .put("complete", orderComplete);
+
+        createUserSpecification = new RequestSpecBuilder()
+                .setContentType(ContentType.JSON)
+                .setBody(usersJsonArray.toString())
+                .build();
+
+        createPetSpecification = new RequestSpecBuilder()
+                .setContentType(ContentType.JSON)
+                .setBody(createPetJson.toString())
+                .build();
+
+        createOrderSpecification = new RequestSpecBuilder()
+                .setContentType(ContentType.JSON)
+                .build();
+
+        loginSpecification = new RequestSpecBuilder()
+                .addQueryParam("username", userName)
+                .addQueryParam( "password", userPassword)
+                .build();
     }
 
     @AfterAll
@@ -102,38 +141,37 @@ public class Tests {
     @Test
     @Order(1)
     public void createAndLoginUser() {
-        RestAssured.given().contentType(ContentType.JSON).body(usersJsonArray.toString())
+        RestAssured.given().spec(createUserSpecification)
                 .when().post(userUrl + "/createWithArray")
-                .then().statusCode(HttpStatus.SC_OK)
-                .and().contentType(ContentType.JSON)
+                .then().spec(okResponse)
                 .and().body("type", equalTo("unknown"))
                 .and().body("message", equalTo("ok"));
 
-        Awaitility.await().atMost(2, TimeUnit.SECONDS);
+        Awaitility.await().atLeast(1, TimeUnit.SECONDS);
 
-        userId = RestAssured.given()
+        JsonPath getUserJsonResponse = RestAssured.given()
                 .when().get(userUrl + "/" + userName)
-                .then().statusCode(HttpStatus.SC_OK)
-                .and().contentType(ContentType.JSON)
-                .and().body("username", equalTo(userName))
-                .and().body("firstName", equalTo(userFirstName))
-                .and().body("lastName", equalTo(userLastName))
-                .and().body("email", equalTo(userEmail))
-                .and().body("password", equalTo(userPassword))
-                .and().body("phone", equalTo(userPhone))
-                .and().body("userStatus", equalTo((int) userStatus))
-                .extract().path("id");
+                .then().spec(okResponse)
+                .extract().jsonPath();
+
+        Assertions.assertEquals(userName, getUserJsonResponse.get("username"));
+        Assertions.assertEquals(userFirstName, getUserJsonResponse.get("firstName"));
+        Assertions.assertEquals(userLastName, getUserJsonResponse.get("lastName"));
+        Assertions.assertEquals(userEmail, getUserJsonResponse.get("email"));
+        Assertions.assertEquals(userPassword, getUserJsonResponse.get("password"));
+        Assertions.assertEquals(userPhone, getUserJsonResponse.get("phone"));
+        Assertions.assertEquals(userStatus, getUserJsonResponse.get("userStatus"));
+
+        userId = getUserJsonResponse.getLong("id");
 
         login();
         logout();
     }
 
     private void login() {
-        userSession = RestAssured.given()
-                .queryParam("username", userName, "password", userPassword)
+        userSession = RestAssured.given().spec(loginSpecification)
                 .when().get(userUrl + "/login")
-                .then().statusCode(HttpStatus.SC_OK)
-                .and().contentType(ContentType.JSON)
+                .then().spec(okResponse)
                 .and().body("type", equalTo("unknown"))
                 .and().body("message", containsString("logged in user session"))
                 .extract().path("message");
@@ -152,25 +190,27 @@ public class Tests {
     @Order(2)
     public void updateUser() {
         createUserJson.put("phone", userUpdatedPhone);
-        RestAssured.given().contentType(ContentType.JSON).body(createUserJson.toString())
+        createUserSpecification.body(createUserJson.toString());
+
+        RestAssured.given().spec(createUserSpecification)
                 .when().put(userUrl + "/" + userName)
-                .then().statusCode(HttpStatus.SC_OK)
-                .and().contentType(ContentType.JSON)
+                .then().spec(okResponse)
                 .and().body("type", equalTo("unknown"));
 
-        Awaitility.await().atMost(2, TimeUnit.SECONDS);
+        Awaitility.await().atLeast(1, TimeUnit.SECONDS);
 
-        RestAssured.given()
+        JsonPath getUserJsonResponse = RestAssured.given()
                 .when().get(userUrl + "/" + userName)
-                .then().statusCode(HttpStatus.SC_OK)
-                .and().contentType(ContentType.JSON)
-                .and().body("username", equalTo(userName))
-                .and().body("firstName", equalTo(userFirstName))
-                .and().body("lastName", equalTo(userLastName))
-                .and().body("email", equalTo(userEmail))
-                .and().body("password", equalTo(userPassword))
-                .and().body("phone", equalTo(userUpdatedPhone))
-                .and().body("userStatus", equalTo((int) userStatus));
+                .then().spec(okResponse)
+                .extract().jsonPath();
+
+        Assertions.assertEquals(userName, getUserJsonResponse.get("username"));
+        Assertions.assertEquals(userFirstName, getUserJsonResponse.get("firstName"));
+        Assertions.assertEquals(userLastName, getUserJsonResponse.get("lastName"));
+        Assertions.assertEquals(userEmail, getUserJsonResponse.get("email"));
+        Assertions.assertEquals(userPassword, getUserJsonResponse.get("password"));
+        Assertions.assertEquals(userUpdatedPhone, getUserJsonResponse.get("phone"));
+        Assertions.assertEquals(userStatus, getUserJsonResponse.get("userStatus"));
     }
 
     @Test
@@ -178,23 +218,25 @@ public class Tests {
     public void createPet() {
         login();
 
-        petId = RestAssured.given().contentType(ContentType.JSON).body(createPetJson.toString())
+        JsonPath createPetJsonResponse = RestAssured.given().spec(createPetSpecification)
                 .when().post(petUrl)
-                .then().statusCode(HttpStatus.SC_OK)
-                .and().contentType(ContentType.JSON)
-                .extract().path("id");
+                .then().spec(okResponse)
+                .extract().jsonPath();
 
-        RestAssured.given()
+        petId = createPetJsonResponse.getLong("id");
+
+        JsonPath getPetJsonResponse = RestAssured.given()
                 .when().get(petUrl + "/" + petId)
-                .then().statusCode(HttpStatus.SC_OK)
-                .and().contentType(ContentType.JSON)
-                .and().body("category.id", equalTo((int) petCategoryId))
-                .and().body("category.name", equalTo(petCategoryName))
-                .and().body("name", equalTo(petName))
-                .and().body("photoUrls[0]", equalTo(petPhotoUrl))
-                .and().body("tags[0].id", equalTo((int) petTagId))
-                .and().body("tags[0].name", equalTo(petTagName))
-                .and().body("status", equalTo(petStatus));
+                .then().spec(okResponse)
+                .extract().jsonPath();
+
+        Assertions.assertEquals(petCategoryId, getPetJsonResponse.get("category.id"));
+        Assertions.assertEquals(petCategoryName, getPetJsonResponse.get("category.name"));
+        Assertions.assertEquals(petName, getPetJsonResponse.get("name"));
+        Assertions.assertEquals(petPhotoUrl, getPetJsonResponse.get("photoUrls[0]"));
+        Assertions.assertEquals(petTagId, getPetJsonResponse.get("tags[0].id"));
+        Assertions.assertEquals(petTagName, getPetJsonResponse.get("tags[0].name"));
+        Assertions.assertEquals(petStatus, getPetJsonResponse.get("status"));
 
         logout();
     }
@@ -205,22 +247,24 @@ public class Tests {
         login();
 
         createOrderJson.put("petId", petId);
+        createOrderSpecification.body(createOrderJson.toString());
 
-        orderId = RestAssured.given().contentType(ContentType.JSON).body(createOrderJson.toString())
+        JsonPath createOrderJsonResponse = RestAssured.given().spec(createOrderSpecification)
                 .when().post(storeUrl + "/order")
-                .then().statusCode(HttpStatus.SC_OK)
-                .and().contentType(ContentType.JSON)
-                .extract().path("id");
+                .then().spec(okResponse)
+                .extract().jsonPath();
+        orderId = createOrderJsonResponse.getLong("id");
 
-        RestAssured.given()
+        JsonPath getOrderJsonResponse = RestAssured.given()
                 .when().get(storeUrl + "/order/" + orderId)
-                .then().statusCode(HttpStatus.SC_OK)
-                .and().contentType(ContentType.JSON)
-                .and().body("petId", equalTo(petId))
-                .and().body("quantity", equalTo(orderQuantity))
-                .and().body("shipDate", containsString(shipDate.substring(0, 23)))
-                .and().body("status", equalTo(orderStatus))
-                .and().body("complete", equalTo(orderComplete));
+                .then().spec(okResponse)
+                .extract().jsonPath();
+
+        Assertions.assertEquals(petId, getOrderJsonResponse.getLong("petId"));
+        Assertions.assertEquals(orderQuantity, getOrderJsonResponse.get("quantity"));
+        Assertions.assertTrue(getOrderJsonResponse.getString("shipDate").contains(shipDate.substring(0, 23)));
+        Assertions.assertEquals(orderStatus, getOrderJsonResponse.get("status"));
+        Assertions.assertEquals(orderComplete, getOrderJsonResponse.get("complete"));
 
         logout();
     }
@@ -230,14 +274,12 @@ public class Tests {
     public void deletePetAndOrder() {
         RestAssured.given()
                 .when().delete(storeUrl + "/order/" + orderId)
-                .then().statusCode(HttpStatus.SC_OK)
-                .and().contentType(ContentType.JSON)
+                .then().spec(okResponse)
                 .and().body("type", equalTo("unknown"));
 
         RestAssured.given()
                 .when().delete(petUrl + "/" + petId)
-                .then().statusCode(HttpStatus.SC_OK)
-                .and().contentType(ContentType.JSON)
+                .then().spec(okResponse)
                 .and().body("type", equalTo("unknown"));
     }
 
@@ -246,17 +288,15 @@ public class Tests {
     public void deleteUser() {
         RestAssured.given()
                 .when().delete(userUrl + "/" + userName)
-                .then().statusCode(HttpStatus.SC_OK)
-                .and().contentType(ContentType.JSON)
+                .then().spec(okResponse)
                 .and().body("type", equalTo("unknown"))
                 .and().body("message", equalTo(userName));
 
-        Awaitility.await().atMost(2, TimeUnit.SECONDS);
+        Awaitility.await().atLeast(1, TimeUnit.SECONDS);
 
         RestAssured.given()
                 .when().get(userUrl + "/" + userName)
-                .then().statusCode(HttpStatus.SC_NOT_FOUND)
-                .and().contentType(ContentType.JSON)
+                .then().spec(notFoundResponse)
                 .and().body("code", equalTo(1))
                 .and().body("type", equalTo("error"))
                 .and().body("message", equalTo("User not found"));
