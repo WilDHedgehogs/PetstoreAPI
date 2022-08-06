@@ -7,6 +7,7 @@ import io.restassured.path.json.JsonPath;
 import io.restassured.specification.RequestSpecification;
 import io.restassured.specification.ResponseSpecification;
 import org.apache.http.HttpStatus;
+import org.apache.log4j.Logger;
 import org.awaitility.Awaitility;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -68,16 +69,20 @@ public class Tests {
             .expectContentType(ContentType.JSON)
             .build();
 
-
     SSLConfig sslConfig = config.getSSLConfig();
+
+    Logger logger = Logger.getLogger(Tests.class);
 
     @BeforeAll
     public void init() {
+        logger.info("Подготовка");
         RestAssured.baseURI = baseUrl;
         RestAssured.basePath = version;
+        logger.info("Работа будет происходит с сервисом " + baseUrl + version);
 
         config = config().sslConfig(sslConfig.with().keystoreType(sslConfig.getKeyStoreType())
                 .trustStore(sslConfig.getTrustStore()).and().strictHostnames());
+        logger.info("SSL настроен");
 
         createUserJson.put("id", userId)
                 .put("username", userName)
@@ -119,6 +124,7 @@ public class Tests {
                 .setContentType(ContentType.JSON)
                 .setBody(createPetJson.toString())
                 .build();
+        logger.info("Json'ы подготовлены");
 
         createOrderSpecification = new RequestSpecBuilder()
                 .setContentType(ContentType.JSON)
@@ -128,10 +134,12 @@ public class Tests {
                 .addQueryParam("username", userName)
                 .addQueryParam( "password", userPassword)
                 .build();
+        logger.info("Специфицикации инициализированы");
     }
 
     @AfterAll
     public void release() {
+        logger.info("Освобождение ресурсов");
         usersJsonArray.clear();
         createUserJson.clear();
         createPetJson.clear();
@@ -141,6 +149,7 @@ public class Tests {
     @Test
     @Order(1)
     public void createAndLoginUser() {
+        logger.info("Загрузка пользователя " + userName);
         RestAssured.given().spec(createUserSpecification)
                 .when().post(userUrl + "/createWithArray")
                 .then().spec(okResponse)
@@ -163,6 +172,7 @@ public class Tests {
         Assertions.assertEquals(userStatus, getUserJsonResponse.get("userStatus"));
 
         userId = getUserJsonResponse.getLong("id");
+        logger.info("Пользователь загружен. ID = " + userId);
 
         login();
         logout();
@@ -176,6 +186,7 @@ public class Tests {
                 .and().body("message", containsString("logged in user session"))
                 .extract().path("message");
         userSession = userSession.substring(userSession.indexOf(":") + 1);
+        logger.info("Пользователь " + userName + " подключился. Сессия " + userSession);
     }
 
     private void logout() {
@@ -184,6 +195,8 @@ public class Tests {
                 .then().statusCode(HttpStatus.SC_OK)
                 .and().body("type", equalTo("unknown"))
                 .and().body("message", equalTo("ok"));
+
+        logger.info("Пользователь " + userName + " отключился");
     }
 
     @Test
@@ -192,6 +205,7 @@ public class Tests {
         createUserJson.put("phone", userUpdatedPhone);
         createUserSpecification.body(createUserJson.toString());
 
+        logger.info("Обновление пользователя " + userName);
         RestAssured.given().spec(createUserSpecification)
                 .when().put(userUrl + "/" + userName)
                 .then().spec(okResponse)
@@ -211,6 +225,7 @@ public class Tests {
         Assertions.assertEquals(userPassword, getUserJsonResponse.get("password"));
         Assertions.assertEquals(userUpdatedPhone, getUserJsonResponse.get("phone"));
         Assertions.assertEquals(userStatus, getUserJsonResponse.get("userStatus"));
+        logger.info("Пользователь обновлен");
     }
 
     @Test
@@ -218,6 +233,7 @@ public class Tests {
     public void createPet() {
         login();
 
+        logger.info("Загрузка питомца " + petName);
         JsonPath createPetJsonResponse = RestAssured.given().spec(createPetSpecification)
                 .when().post(petUrl)
                 .then().spec(okResponse)
@@ -238,6 +254,8 @@ public class Tests {
         Assertions.assertEquals(petTagName, getPetJsonResponse.get("tags[0].name"));
         Assertions.assertEquals(petStatus, getPetJsonResponse.get("status"));
 
+        logger.info("Питомец " + petName + " загружен. ID = " + petId);
+
         logout();
     }
 
@@ -246,6 +264,7 @@ public class Tests {
     public void createOrder() {
         login();
 
+        logger.info("Загрузка заказа");
         createOrderJson.put("petId", petId);
         createOrderSpecification.body(createOrderJson.toString());
 
@@ -265,6 +284,7 @@ public class Tests {
         Assertions.assertTrue(getOrderJsonResponse.getString("shipDate").contains(shipDate.substring(0, 23)));
         Assertions.assertEquals(orderStatus, getOrderJsonResponse.get("status"));
         Assertions.assertEquals(orderComplete, getOrderJsonResponse.get("complete"));
+        logger.info("Заказ " + orderId + " загружен");
 
         logout();
     }
@@ -272,20 +292,25 @@ public class Tests {
     @Test
     @Order(5)
     public void deletePetAndOrder() {
+        logger.warn("Удаление заказа " + orderId);
         RestAssured.given()
                 .when().delete(storeUrl + "/order/" + orderId)
                 .then().spec(okResponse)
                 .and().body("type", equalTo("unknown"));
+        logger.warn("Заказ " + orderId + " удален");
 
+        logger.warn("Удаление питомца " + petName);
         RestAssured.given()
                 .when().delete(petUrl + "/" + petId)
                 .then().spec(okResponse)
                 .and().body("type", equalTo("unknown"));
+        logger.warn("Питомец " + petName + " удален");
     }
 
     @Test
     @Order(6)
     public void deleteUser() {
+        logger.warn("Удаление пользователя " + userName);
         RestAssured.given()
                 .when().delete(userUrl + "/" + userName)
                 .then().spec(okResponse)
@@ -300,6 +325,7 @@ public class Tests {
                 .and().body("code", equalTo(1))
                 .and().body("type", equalTo("error"))
                 .and().body("message", equalTo("User not found"));
+        logger.warn("Пользователь " + userName + " удален");
     }
 
 }
